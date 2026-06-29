@@ -17,12 +17,12 @@
     },
     "dataSources": {
       "mainService": {
-        "uri": "/sap/opu/odata4/sap/zui_zt_rest_conf_o4/srvd/sap/zui_zt_rest_conf_o4/0001/",
+        "uri": "/sap/opu/odata/sap/ZZAPI_UI_ODATA/",
         "type": "OData",
         "settings": {
           "annotations": [],
           "localUri": "localService/mainService/metadata.xml",
-          "odataVersion": "4.0"
+          "odataVersion": "2.0"
         }
       }
     },

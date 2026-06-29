@@ -18,9 +18,6 @@ sap.ui.define([
             this._values = { destLoc: "", huBarcode: "" };
             this._lastInputId = "";
 
-            // CSRF Token 缓存
-            this._csrfToken = "";
-
             // 全局事件监听
             this._focusHandler = this._onFocus.bind(this);
             document.addEventListener("focusin", this._focusHandler);
@@ -92,7 +89,7 @@ sap.ui.define([
             this._clearError(oInput);
 
             // 验证目的地是否存在
-            this._callApi("check_dest", { DESTLOC: sValue },
+            this._callApi("check_dest", { destLoc: sValue },
                 function() {
                     var oNext = this.byId("huBarcode");
                     if (oNext) { oNext.focus(); }
@@ -119,7 +116,7 @@ sap.ui.define([
             this._clearError(oInput);
 
             // 验证 HU 是否存在
-            this._callApi("check_hu", { HU: sValue },
+            this._callApi("check_hu", { hu: sValue },
                 function() {
                     // 验证通过，加入表格
                     this._addHUToTable(sValue);
@@ -216,8 +213,8 @@ sap.ui.define([
             var aHUs = this._huData.items.map(function(o) { return o.barcode; });
 
             this._callApi("confirm", {
-                    DESTLOC: sDestLoc,
-                    HUS: aHUs
+                    destLoc: sDestLoc,
+                    hus: aHUs
                 },
                 function(oData) {
                     try {
@@ -240,90 +237,44 @@ sap.ui.define([
             );
         },
 
-        /* ── 后端 API 调用（OData V4，fetch 方式 + CSRF 处理） ── */
+        /* ── 后端 API 调用（对齐 zewm006，OData V2 模型） ── */
         _callApi: function(sMname, oParams, fnSuccess, fnError, sCode) {
-            var that = this;
-            var sUrl = "/sap/opu/odata4/sap/zui_zt_rest_conf_o4/srvd/sap/zui_zt_rest_conf_o4/0001/conf";
+            var oModel = this.getOwnerComponent().getModel();
+            if (!oModel) {
+                fnError("OData model not available");
+                return;
+            }
+            if (oModel.isMetadataLoadingFailed && oModel.isMetadataLoadingFailed()) {
+                fnError("Metadata loading failed - check OData service: /sap/opu/odata/sap/ZZAPI_UI_ODATA/");
+                return;
+            }
 
-            var oPayload = {
-                Zznumb: sCode || "ZEWM005",
-                Zzname: sMname.toUpperCase(),
-                Zzfname: "ZCL_ZEWM005_TRANSFER",
-                Zzipara: JSON.stringify(Object.assign(
-                    { MNAME: sMname.toUpperCase() },
+            var oEntry = {
+                uuid: this._generateUuid(),
+                code: sCode || "ZEWM005",
+                reqparam: JSON.stringify(Object.assign(
+                    { fname: "ZCL_ZEWM005_TRANSFER", mname: sMname.toUpperCase() },
                     oParams
                 ))
             };
 
-            var fnDoPost = function(sToken) {
-                var oHeaders = {
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Accept": "application/json"
-                };
-                if (sToken) {
-                    oHeaders["x-csrf-token"] = sToken;
+            oModel.create("/OData", oEntry, {
+                success: function(oData) {
+                    if (oData.restype === "E") {
+                        fnError(oData.resmsg || "Operation failed");
+                    } else {
+                        fnSuccess(oData);
+                    }
+                },
+                error: function(oError) {
+                    var sMsg = "";
+                    try {
+                        sMsg = JSON.parse(oError.responseText).error.message.value;
+                    } catch (e) {
+                        sMsg = oError.message || oError.statusText || e.message || "";
+                    }
+                    fnError(sMsg);
                 }
-                return fetch(sUrl, {
-                    method: "POST",
-                    headers: oHeaders,
-                    body: JSON.stringify(oPayload)
-                });
-            };
-
-            var fnProcessResponse = function(oResponse) {
-                if (!oResponse.ok) {
-                    return oResponse.text().then(function(sText) {
-                        var sMsg = sText;
-                        try {
-                            var oErr = JSON.parse(sText);
-                            sMsg = (oErr.error && oErr.error.message && oErr.error.message.value) || sText;
-                        } catch {
-                            sMsg = sText;
-                        }
-                        throw new Error(sMsg);
-                    });
-                }
-                return oResponse.json();
-            };
-
-            var fnHandleResult = function(oData) {
-                if (oData && oData.Zzrestype === "E") {
-                    fnError(oData.Zzresmsg || "Operation failed");
-                } else {
-                    fnSuccess({
-                        restype: oData && oData.Zzrestype,
-                        resmsg: oData && oData.Zzresmsg,
-                        resdata: oData && oData.Zzresdata
-                    });
-                }
-            };
-
-            // 已有缓存 Token，直接 POST
-            if (that._csrfToken) {
-                fnDoPost(that._csrfToken)
-                    .then(fnProcessResponse)
-                    .then(fnHandleResult)
-                    .catch(function(oError) {
-                        fnError(oError.message || "Request failed");
-                    });
-                return;
-            }
-
-            // 先 GET 获取 CSRF Token，再 POST
-            fetch(sUrl, {
-                method: "GET",
-                headers: {
-                    "x-csrf-token": "fetch",
-                    "Accept": "application/json"
-                }
-            }).then(function(oResponse) {
-                var sToken = oResponse.headers.get("x-csrf-token");
-                if (sToken) {
-                    that._csrfToken = sToken;
-                }
-                return fnDoPost(sToken);
-            }).then(fnProcessResponse).then(fnHandleResult).catch(function(oError) {
-                fnError(oError.message || "Request failed");
             });
         },
 
