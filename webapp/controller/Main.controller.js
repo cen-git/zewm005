@@ -18,6 +18,9 @@ sap.ui.define([
             this._values = { destLoc: "", huBarcode: "" };
             this._lastInputId = "";
 
+            // CSRF Token 缓存
+            this._csrfToken = "";
+
             // 全局事件监听
             this._focusHandler = this._onFocus.bind(this);
             document.addEventListener("focusin", this._focusHandler);
@@ -239,6 +242,7 @@ sap.ui.define([
 
         /* ── 后端 API 调用（参照 zewm006 模式，OData V4） ── */
         _callApi: function(sMname, oParams, fnSuccess, fnError, sCode) {
+            var that = this;
             var sUrl = "/sap/opu/odata4/sap/zui_zt_rest_conf_o4/srvd/sap/zui_zt_rest_conf_o4/0001/conf";
 
             var oPayload = {
@@ -251,14 +255,22 @@ sap.ui.define([
                 ))
             };
 
-            fetch(sUrl, {
-                method: "POST",
-                headers: {
+            var fnDoPost = function(sToken) {
+                var oHeaders = {
                     "Content-Type": "application/json; charset=utf-8",
                     "Accept": "application/json"
-                },
-                body: JSON.stringify(oPayload)
-            }).then(function(oResponse) {
+                };
+                if (sToken) {
+                    oHeaders["x-csrf-token"] = sToken;
+                }
+                return fetch(sUrl, {
+                    method: "POST",
+                    headers: oHeaders,
+                    body: JSON.stringify(oPayload)
+                });
+            };
+
+            var fnProcessResponse = function(oResponse) {
                 if (!oResponse.ok) {
                     return oResponse.text().then(function(sText) {
                         var sMsg = sText;
@@ -272,7 +284,43 @@ sap.ui.define([
                     });
                 }
                 return oResponse.json();
-            }).then(function(oData) {
+            };
+
+            // 如果已有缓存的 Token，直接发 POST
+            if (that._csrfToken) {
+                fnDoPost(that._csrfToken)
+                    .then(fnProcessResponse)
+                    .then(function(oData) {
+                        if (oData && oData.Zzrestype === "E") {
+                            fnError(oData.Zzresmsg || "Operation failed");
+                        } else {
+                            fnSuccess({
+                                restype: oData && oData.Zzrestype,
+                                resmsg: oData && oData.Zzresmsg,
+                                resdata: oData && oData.Zzresdata
+                            });
+                        }
+                    }).catch(function(oError) {
+                        fnError(oError.message || "Request failed");
+                    });
+                return;
+            }
+
+            // 没有 Token：先发 GET 请求获取 CSRF Token
+            fetch(sUrl, {
+                method: "GET",
+                headers: {
+                    "x-csrf-token": "fetch",
+                    "Accept": "application/json"
+                }
+            }).then(function(oResponse) {
+                // 从响应头获取 Token
+                var sToken = oResponse.headers.get("x-csrf-token");
+                if (sToken) {
+                    that._csrfToken = sToken;
+                }
+                return fnDoPost(sToken);
+            }).then(fnProcessResponse).then(function(oData) {
                 if (oData && oData.Zzrestype === "E") {
                     fnError(oData.Zzresmsg || "Operation failed");
                 } else {
