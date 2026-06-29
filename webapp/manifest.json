@@ -62,7 +62,8 @@
       "minUI5Version": "1.142.12",
       "libs": {
         "sap.m": {},
-        "sap.ui.core": {}
+        "sap.ui.core": {},
+        "sap.ui.layout": {}
       }
     },
     "contentDensities": {
@@ -73,17 +74,15 @@
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
-          "bundleName": "zewm005.i18n.i18n"
+          "bundleName": "zewm005.i18n.i18n",
+          "supportedLocales": [""],
+          "fallbackLocale": ""
         }
       },
       "": {
         "dataSource": "mainService",
-        "preload": true,
-        "settings": {
-          "operationMode": "Server",
-          "autoExpandSelect": true,
-          "earlyRequests": true
-        }
+        "preload": false,
+        "settings": {}
       }
     },
     "resources": {

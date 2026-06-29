@@ -1,6 +1,63 @@
 <mvc:View controllerName="zewm005.controller.Main"
     xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m">
-    <Page id="page" title="{i18n>title}">
+    xmlns="sap.m"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:core="sap.ui.core">
+    <Page id="transferPage" showHeader="false">
+        <content>
+            <Toolbar id="transferToolbar">
+                <ToolbarSpacer id="transferToolbarSpacer"/>
+                <Title id="transferTitle" text="{i18n>titleMain}"/>
+                <ToolbarSpacer id="transferToolbarSpacer2"/>
+            </Toolbar>
+            <f:SimpleForm id="transferForm" editable="true" layout="ResponsiveGridLayout">
+                <f:content>
+                    <Label id="lblDestLoc" text="{i18n>lblDestLoc}"/>
+                    <Input id="destLoc" maxLength="4" liveChange=".onDestLocLiveChange"/>
+                    <Label id="lblHUBarcode" text="{i18n>lblHUBarcode}"/>
+                    <Input id="huBarcode" maxLength="10" liveChange=".onHUBarcodeLiveChange"/>
+                </f:content>
+            </f:SimpleForm>
+            <HBox id="huTableHeaderBox"
+                justifyContent="SpaceBetween"
+                alignItems="Center"
+                class="sapUiMediumMarginBeginEnd sapUiSmallMarginTop">
+                <Title id="huTableTitle" text="{i18n>lblHUTable}"/>
+                <HBox id="huTableCountBox" alignItems="Center">
+                    <Label id="huTableCountLabel" text="{i18n>lblHUCount}"/>
+                    <Text id="huTableCountNum" text="{huModel>/count}"/>
+                </HBox>
+            </HBox>
+            <Table id="huTable"
+                items="{huModel>/items}"
+                noDataText="{i18n>noHUScanned}"
+                class="sapUiMediumMarginBeginEnd">
+                <columns>
+                    <Column id="huColSeq" width="5rem">
+                        <Text id="huColSeqText" text="{i18n>colSeq}"/>
+                    </Column>
+                    <Column id="huColBarcode">
+                        <Text id="huColBarcodeText" text="{i18n>colHUBarcode}"/>
+                    </Column>
+                </columns>
+                <items>
+                    <ColumnListItem id="huListItem">
+                        <cells>
+                            <Text id="huCellSeq" text="{huModel>seq}"/>
+                            <Text id="huCellBarcode" text="{huModel>barcode}"/>
+                        </cells>
+                    </ColumnListItem>
+                </items>
+            </Table>
+        </content>
+        <footer>
+            <Toolbar id="transferFooter">
+                <ToolbarSpacer id="transferFooterSpacer"/>
+                <Button id="btnBack" text="{i18n>btnBack}" press=".onBack"/>
+                <Button id="btnClear" text="{i18n>btnClear}" press=".onClear"/>
+                <Button id="btnRefresh" text="{i18n>btnRefresh}" press=".onRefresh"/>
+                <Button id="btnConfirm" text="{i18n>btnConfirm}" press=".onConfirm"/>
+            </Toolbar>
+        </footer>
     </Page>
 </mvc:View>
