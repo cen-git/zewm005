@@ -89,7 +89,7 @@ sap.ui.define([
             this._clearError(oInput);
 
             // 验证目的地是否存在
-            this._callApi("check_dest", { destLoc: sValue },
+            this._callApi("check_dest", { DESTLOC: sValue },
                 function() {
                     var oNext = this.byId("huBarcode");
                     if (oNext) { oNext.focus(); }
@@ -116,7 +116,7 @@ sap.ui.define([
             this._clearError(oInput);
 
             // 验证 HU 是否存在
-            this._callApi("check_hu", { hu: sValue },
+            this._callApi("check_hu", { HU: sValue },
                 function() {
                     // 验证通过，加入表格
                     this._addHUToTable(sValue);
@@ -213,8 +213,8 @@ sap.ui.define([
             var aHUs = this._huData.items.map(function(o) { return o.barcode; });
 
             this._callApi("confirm", {
-                    destLoc: sDestLoc,
-                    hus: aHUs
+                    DESTLOC: sDestLoc,
+                    HUS: aHUs
                 },
                 function(oData) {
                     try {
@@ -254,7 +254,7 @@ sap.ui.define([
                 Zzname: sMname.toUpperCase(),
                 Zzfname: "ZCL_ZEWM005_TRANSFER",
                 Zzipara: JSON.stringify(Object.assign(
-                    { mname: sMname.toUpperCase() },
+                    { MNAME: sMname.toUpperCase() },
                     oParams
                 ))
             };
