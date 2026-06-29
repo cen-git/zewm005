@@ -18,6 +18,9 @@ sap.ui.define([
             this._values = { destLoc: "", huBarcode: "" };
             this._lastInputId = "";
 
+            // CSRF Token 缓存
+            this._csrfToken = "";
+
             // 全局事件监听
             this._focusHandler = this._onFocus.bind(this);
             document.addEventListener("focusin", this._focusHandler);
@@ -237,19 +240,12 @@ sap.ui.define([
             );
         },
 
-        /* ── 后端 API 调用（参照 zewm006 模式，使用 OData 模型） ── */
+        /* ── 后端 API 调用（OData V4，fetch 方式 + CSRF 处理） ── */
         _callApi: function(sMname, oParams, fnSuccess, fnError, sCode) {
-            var oModel = this.getOwnerComponent().getModel();
-            if (!oModel) {
-                fnError("OData model not available");
-                return;
-            }
-            if (oModel.isMetadataLoadingFailed && oModel.isMetadataLoadingFailed()) {
-                fnError("Metadata loading failed - check OData service: /sap/opu/odata4/sap/zui_zt_rest_conf_o4/srvd/sap/zui_zt_rest_conf_o4/0001/");
-                return;
-            }
+            var that = this;
+            var sUrl = "/sap/opu/odata4/sap/zui_zt_rest_conf_o4/srvd/sap/zui_zt_rest_conf_o4/0001/conf";
 
-            var oEntry = {
+            var oPayload = {
                 Zznumb: sCode || "ZEWM005",
                 Zzname: sMname.toUpperCase(),
                 Zzfname: "ZCL_ZEWM005_TRANSFER",
@@ -259,27 +255,75 @@ sap.ui.define([
                 ))
             };
 
-            oModel.create("/conf", oEntry, {
-                success: function(oData) {
-                    if (oData.Zzrestype === "E") {
-                        fnError(oData.Zzresmsg || "Operation failed");
-                    } else {
-                        fnSuccess({
-                            restype: oData.Zzrestype,
-                            resmsg: oData.Zzresmsg,
-                            resdata: oData.Zzresdata
-                        });
-                    }
-                },
-                error: function(oError) {
-                    var sMsg = "";
-                    try {
-                        sMsg = JSON.parse(oError.responseText).error.message.value;
-                    } catch (e) {
-                        sMsg = oError.message || oError.statusText || e.message || "";
-                    }
-                    fnError(sMsg);
+            var fnDoPost = function(sToken) {
+                var oHeaders = {
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Accept": "application/json"
+                };
+                if (sToken) {
+                    oHeaders["x-csrf-token"] = sToken;
                 }
+                return fetch(sUrl, {
+                    method: "POST",
+                    headers: oHeaders,
+                    body: JSON.stringify(oPayload)
+                });
+            };
+
+            var fnProcessResponse = function(oResponse) {
+                if (!oResponse.ok) {
+                    return oResponse.text().then(function(sText) {
+                        var sMsg = sText;
+                        try {
+                            var oErr = JSON.parse(sText);
+                            sMsg = (oErr.error && oErr.error.message && oErr.error.message.value) || sText;
+                        } catch {
+                            sMsg = sText;
+                        }
+                        throw new Error(sMsg);
+                    });
+                }
+                return oResponse.json();
+            };
+
+            var fnHandleResult = function(oData) {
+                if (oData && oData.Zzrestype === "E") {
+                    fnError(oData.Zzresmsg || "Operation failed");
+                } else {
+                    fnSuccess({
+                        restype: oData && oData.Zzrestype,
+                        resmsg: oData && oData.Zzresmsg,
+                        resdata: oData && oData.Zzresdata
+                    });
+                }
+            };
+
+            // 已有缓存 Token，直接 POST
+            if (that._csrfToken) {
+                fnDoPost(that._csrfToken)
+                    .then(fnProcessResponse)
+                    .then(fnHandleResult)
+                    .catch(function(oError) {
+                        fnError(oError.message || "Request failed");
+                    });
+                return;
+            }
+
+            // 先 GET 获取 CSRF Token，再 POST
+            fetch(sUrl, {
+                method: "GET",
+                headers: {
+                    "x-csrf-token": "fetch",
+                    "Accept": "application/json"
+                }
+            }).then(function(oResponse) {
+                var sToken = oResponse.headers.get("x-csrf-token");
+                if (sToken) {
+                    that._csrfToken = sToken;
+                }
+                return fnDoPost(sToken);
+            }).then(fnProcessResponse).then(fnHandleResult).catch(function(oError) {
+                fnError(oError.message || "Request failed");
             });
         },
 
