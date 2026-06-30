@@ -118,6 +118,11 @@ sap.ui.define([
             // 验证 HU 是否存在
             this._callApi("check_hu", { hu: sValue },
                 function() {
+                    // 去重校验
+                    if (this._isHUDuplicate(sValue)) {
+                        this._showError(oInput, this._i18n("msgHUDuplicate", [sValue]));
+                        return;
+                    }
                     // 验证通过，加入表格
                     this._addHUToTable(sValue);
                     oInput.setValue("");
@@ -136,6 +141,12 @@ sap.ui.define([
         },
 
         /* ── HU 表格操作 ──────────────────────────────────────── */
+        _isHUDuplicate: function(sBarcode) {
+            return this._huData.items.some(function(o) {
+                return o.barcode === sBarcode;
+            });
+        },
+
         _addHUToTable: function(sBarcode) {
             this._huData.items.push({
                 seq: this._huData.items.length + 1,
