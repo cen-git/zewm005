@@ -14,6 +14,9 @@ sap.ui.define([
             var oHuModel = new JSONModel(this._huData);
             this.getView().setModel(oHuModel, "huModel");
 
+            // 正在校验中（尚未加入表格）的 HU，避免重复扫描触发的并发请求绕过去重校验
+            this._pendingHUs = {};
+
             // 字段值缓存
             this._values = { destLoc: "", huBarcode: "" };
             this._lastInputId = "";
@@ -115,9 +118,17 @@ sap.ui.define([
             this._values.huBarcode = sValue;
             this._clearError(oInput);
 
+            // 去重校验（含正在校验中尚未入表的条码，避免重复扫描产生的并发请求绕过去重）
+            if (this._isHUDuplicate(sValue) || this._pendingHUs[sValue]) {
+                this._showError(oInput, this._i18n("msgHUDuplicate", [sValue]));
+                return;
+            }
+            this._pendingHUs[sValue] = true;
+
             // 验证 HU 是否存在
             this._callApi("check_hu", { hu: sValue },
                 function() {
+                    delete this._pendingHUs[sValue];
                     // 去重校验
                     if (this._isHUDuplicate(sValue)) {
                         this._showError(oInput, this._i18n("msgHUDuplicate", [sValue]));
@@ -130,6 +141,7 @@ sap.ui.define([
                     oInput.focus();
                 }.bind(this),
                 function(sMsg) {
+                    delete this._pendingHUs[sValue];
                     var sMsg2 = sMsg;
                     if (!sMsg || sMsg === "Request failed") {
                         sMsg2 = this._i18n("msgHUNotExist", [sValue]);
@@ -159,6 +171,7 @@ sap.ui.define([
         _clearHUTable: function() {
             this._huData.items = [];
             this._huData.count = 0;
+            this._pendingHUs = {};
             this.getView().getModel("huModel").refresh(true);
         },
 
